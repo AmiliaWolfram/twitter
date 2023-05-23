@@ -52,11 +52,10 @@ class ReactionTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Reply)
 class ReplyAdmin(admin.ModelAdmin):
-    list_display = ['tweet', get_short_text, 'created_at', 'updated_at', 'profile', 'get_reactions_str']
+    list_display = ['tweet', get_short_text, 'created_at', 'updated_at']
     search_fields = ['text', 'profile__user__username__exact']
     actions_on_bottom = True
     actions_on_top = False
     empty_value_display = '-'
     fields = (('text', 'profile'), 'tweet')
-    list_editable = ['profile', ]
     sortable_by = ['created_at', 'id']

@@ -1,11 +1,41 @@
+import io
+from django.utils import timezone
 from django.contrib import admin
 from django.db import models
+from PIL import Image, ImageFont, ImageDraw
+from django.core.files import File
 
 from accounts.models import Profile
 
 
+def process_image(img, text=None, ext='png', font_type='arial.ttf', font_size=32, new_height=None, new_width=None):
+    image = Image.open(img)
+
+    width, height = image.size
+    if new_width:
+        new_height = int(new_width * height / width)
+    elif new_height:
+        new_width = int(width * new_height / height)
+
+    if new_width and new_height:
+        image.resize((new_width, new_height))
+
+    if text:
+        img_draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype(font_type, size=font_size)
+        img_draw.text((10, 10), text, font=font)
+
+    image_io = io.BytesIO()
+    image.save(image_io, ext)
+    return File(image_io, f'image.{ext}')
+
+
 def tweet_image_store(instance, filename):
-    return f'profile/{instance.profile.user.username}/{instance.created_at}/{filename}'
+    return f'profile/{instance.profile.user.username}/{timezone.now().strftime("%Y-%m-%d_%H%M")}/{filename}'
+
+
+def reply_image_store(instance, filename):
+    return f'repl/{instance.profile.user.username}/{timezone.now().strftime("%Y-%m-%d_%H%M")}/{filename}'
 
 
 class Tweet(models.Model):
@@ -18,6 +48,11 @@ class Tweet(models.Model):
     class Meta:
         verbose_name = "Твит"
         verbose_name_plural = "Твиты"
+
+    def save(self, *args, **kwargs):
+        if self.image:
+            self.image = process_image(self.image, text='Property of me!', font_size=24)
+        super().save(*args, **kwargs)
 
     def all_reactions(self):
         result = {}
@@ -53,6 +88,12 @@ class Reply(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     profile = models.ForeignKey(Profile, on_delete=models.PROTECT)
+    image_r = models.ImageField(upload_to=reply_image_store, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.image_r:
+            self.image = process_image(self.image_r, text='Property of me!', font_size=16)
+        super().save(*args, **kwargs)
 
     def get_reactions(self):
         reactions = self.reply_reactions.all()
@@ -63,7 +104,6 @@ class Reply(models.Model):
             else:
                 result[reaction.reaction.name] = 1
         return result
-
 
     def __str__(self):
         return self.text
